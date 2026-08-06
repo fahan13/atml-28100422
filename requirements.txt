@@ -1,0 +1,11 @@
+torch
+torchvision
+transformers
+timm
+ftfy
+regex
+git+https://github.com/openai/CLIP.git
+scikit-learn
+umap-learn
+matplotlib
+seaborn
