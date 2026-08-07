@@ -2,6 +2,7 @@
 (Sources: MIT 6.S191 CNN lecture, Stanford CS231n Lecture 6 — Training CNNs & CNN Architectures)
 
 ## 1. Baseline Setup
+
   ### Baseline Setup — concrete numbers (from our own run)
 - ResNet-152 pretrained on ImageNet has 60,192,808 total parameters.
 - After freezing the backbone and replacing the 1000-class head with a fresh
@@ -12,6 +13,7 @@
   reuse all ~58 million parameters' worth of learned ImageNet features for
   free, and only need to learn a small linear mapping (20,490 params) from
   those features to our 10 target classes.
+
   ### Baseline Setup — training results (5 epochs, frozen backbone + linear head)
 | Epoch | Train Loss | Train Acc | Val Acc |
 |-------|-----------|-----------|---------|
@@ -30,6 +32,27 @@
   pretrained backbone's features already generalize well to a different (but
   related) image classification task — supporting the case that training
   ResNet-152 from scratch on CIFAR-10 would be both unnecessary and wasteful.
+
+  ### Residual Connections — training results (3 disabled skip connections in layer3)
+| Epoch | Train Loss | Train Acc | Val Acc |
+|-------|-----------|-----------|---------|
+| 1     | 2.279     | 13.8%     | 14.2%   |
+| 5     | 2.253     | 15.4%     | 14.4%   |
+
+- Disabling skip connections in just 3 of layer3's 36 blocks caused near-total
+  training failure: accuracy stays around 14-15% (barely above the 10% random-
+  guess baseline for CIFAR-10's 10 classes), and loss plateaus near ln(10)≈2.303
+  (the theoretical loss of a uniformly random classifier).
+- This is a substantially more severe effect than the original ResNet paper's
+  degradation problem (which showed elevated error, not near-complete failure
+  to learn), likely because our setting differs in a key way: we're not just
+  disrupting gradient flow in a plain network trained from scratch, but also
+  corrupting the *forward-pass* representations that the remaining pretrained
+  layers (rest of layer3, all of layer4) were never trained to interpret without
+  their expected identity/residual signal.
+- Confirms the qualitative direction predicted by the residual-connection theory:
+  removing skip connections severely harms both convergence and final accuracy,
+  even when only a small fraction of the network's blocks are affected.
 
 ### Why is it unnecessary/impractical to train ResNet-152 from scratch on a small dataset?
 - ResNet-152 has tens of millions of parameters, originally trained on ImageNet (~1.2M images, 1000 classes).
@@ -51,6 +74,9 @@
 - CS231n's practical framework (their 2x2 chart): with a small dataset similar to ImageNet (like
   CIFAR-10), freezing and training only a linear head is the recommended strategy — matches exactly
   what subtask 1 asks us to do.
+
+
+
 
 ## 2. Residual Connections in Practice
 
