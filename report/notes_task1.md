@@ -2,6 +2,34 @@
 (Sources: MIT 6.S191 CNN lecture, Stanford CS231n Lecture 6 — Training CNNs & CNN Architectures)
 
 ## 1. Baseline Setup
+  ### Baseline Setup — concrete numbers (from our own run)
+- ResNet-152 pretrained on ImageNet has 60,192,808 total parameters.
+- After freezing the backbone and replacing the 1000-class head with a fresh
+  10-class head (nn.Linear(2048, 10)) for CIFAR-10, only 20,490 parameters
+  remain trainable (2048*10 weights + 10 biases) — a ~0.03% of the original
+  model's parameter count.
+- This is a concrete illustration of *why* freezing is efficient: we get to
+  reuse all ~58 million parameters' worth of learned ImageNet features for
+  free, and only need to learn a small linear mapping (20,490 params) from
+  those features to our 10 target classes.
+  ### Baseline Setup — training results (5 epochs, frozen backbone + linear head)
+| Epoch | Train Loss | Train Acc | Val Acc |
+|-------|-----------|-----------|---------|
+| 1     | 0.696     | 78.7%     | 83.2%   |
+| 2     | 0.491     | 83.5%     | 84.5%   |
+| 3     | 0.448     | 84.9%     | 84.2%   |
+| 4     | 0.425     | 85.8%     | 84.1%   |
+| 5     | 0.408     | 86.2%     | 85.3%   |
+
+- Val accuracy plateaus around 84-85% after epoch 2, while train accuracy keeps
+  climbing slowly — the ~20K-parameter linear head quickly extracts what it can
+  from the frozen 2048-dim ResNet-152 features, and further epochs give
+  diminishing returns.
+- Reaching ~85% validation accuracy on CIFAR-10 after just 5 epochs, training
+  only 0.03% of the model's parameters, is direct evidence that the ImageNet-
+  pretrained backbone's features already generalize well to a different (but
+  related) image classification task — supporting the case that training
+  ResNet-152 from scratch on CIFAR-10 would be both unnecessary and wasteful.
 
 ### Why is it unnecessary/impractical to train ResNet-152 from scratch on a small dataset?
 - ResNet-152 has tens of millions of parameters, originally trained on ImageNet (~1.2M images, 1000 classes).
