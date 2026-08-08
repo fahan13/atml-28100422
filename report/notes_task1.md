@@ -54,6 +54,35 @@
   removing skip connections severely harms both convergence and final accuracy,
   even when only a small fraction of the network's blocks are affected.
 
+  ### Feature Hierarchies — activation shapes (batch of 64 CIFAR-10 images)
+| Layer  | Channels | Spatial size |
+|--------|----------|--------------|
+| early (layer1)  | 256  | 56x56 |
+| middle (layer3) | 1024 | 14x14 |
+| late (layer4)   | 2048 | 7x7   |
+
+As depth increases, spatial resolution shrinks (56->14->7) while channel
+depth grows (256->1024->2048) -- concrete confirmation of the
+downsample-while-deepening pattern: early layers preserve spatial detail
+with fewer feature types, late layers compress spatial detail almost
+entirely in favor of many more abstract, high-level feature channels.
+
+### Feature Hierarchies -- t-SNE visualization (500 CIFAR-10 validation images)
+See: task1_resnet/feature_hierarchy_tsne.png
+
+**Note:** first attempt used only 64 images + raw t-SNE and showed no
+clustering anywhere. Fixed by using ~500 images (~50/class) and running
+PCA (to 50 dims) before t-SNE -- standard practice, needed for a clean result.
+
+- Early layer (layer1): all 10 classes mixed together, no clustering --
+  matches early layers detecting generic, class-agnostic features (edges, textures).
+- Middle layer (layer3): partial clustering starts forming, but animal
+  classes still overlap heavily.
+- Late layer (layer4): clean, well-separated clusters for almost every class --
+  strong evidence for why a simple linear head (subtask 1) reaches ~85% accuracy.
+- Bonus: late-layer plot splits into two semantic halves -- animals vs.
+  vehicles -- a distinction the network was never explicitly trained for.
+
 ### Why is it unnecessary/impractical to train ResNet-152 from scratch on a small dataset?
 - ResNet-152 has tens of millions of parameters, originally trained on ImageNet (~1.2M images, 1000 classes).
 - CIFAR-10 has only 50,000 training images across 10 classes — far too little data relative to the
