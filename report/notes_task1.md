@@ -67,7 +67,7 @@ downsample-while-deepening pattern: early layers preserve spatial detail
 with fewer feature types, late layers compress spatial detail almost
 entirely in favor of many more abstract, high-level feature channels.
 
-### Feature Hierarchies -- t-SNE visualization (500 CIFAR-10 validation images)
+  ### Feature Hierarchies -- t-SNE visualization (500 CIFAR-10 validation images)
 See: task1_resnet/feature_hierarchy_tsne.png
 
 **Note:** first attempt used only 64 images + raw t-SNE and showed no
@@ -83,7 +83,30 @@ PCA (to 50 dims) before t-SNE -- standard practice, needed for a clean result.
 - Bonus: late-layer plot splits into two semantic halves -- animals vs.
   vehicles -- a distinction the network was never explicitly trained for.
 
-### Why is it unnecessary/impractical to train ResNet-152 from scratch on a small dataset?
+  ### Transfer Learning — 4-way comparison (CIFAR-100, 5,000-image subset, 2 epochs)
+Note: dataset reduced to 5,000 images (from 50,000) and capped at 2 epochs due
+to GPU time/thermal constraints on the laptop used. Absolute accuracies are far
+from each setting's ceiling, but the *relative* comparison (the actual point of
+this subtask) is clear and consistent with theory.
+
+| Setting | Final Val Acc | Time for 2 epochs |
+|---|---|---|
+| Pretrained, last-block-only | 48.6% | ~3.5 min |
+| Pretrained, full-backbone | 68.6% | ~61 min |
+| Random-init, last-block-only | 3.1% | ~29 min |
+| Random-init, full-backbone | 3.4% | ~68 min |
+
+- Pretrained massively outperforms random-init in both fine-tuning modes
+  (48-69% vs 3%), confirming that ImageNet-pretrained features transfer well
+  even to a new, harder, fine-grained dataset (CIFAR-100, 100 classes).
+- Random-init barely improves over 2 epochs (~3%, near the 1% random-guess
+  floor for 100 classes) — training from scratch needs far more data/epochs
+  to get off the ground, consistent with CS231n's framework.
+- Full-backbone fine-tuning beats last-block-only in both conditions, but at
+  steep compute cost: ~17x longer for pretrained (+20 accuracy points),
+  illustrating the real compute-vs-accuracy tradeoff this subtask asks about.
+
+  ### Why is it unnecessary/impractical to train ResNet-152 from scratch on a small dataset?
 - ResNet-152 has tens of millions of parameters, originally trained on ImageNet (~1.2M images, 1000 classes).
 - CIFAR-10 has only 50,000 training images across 10 classes — far too little data relative to the
   model's capacity to train all those parameters from random initialization without badly overfitting.
@@ -91,7 +114,7 @@ PCA (to 50 dims) before t-SNE -- standard practice, needed for a clean result.
   textures, simple shapes) that are common across almost all natural images — relearning these from
   scratch on a small dataset just wastes compute and data.
 
-### What does freezing most of the network tell us about transferability of features?
+  ### What does freezing most of the network tell us about transferability of features?
 - CS231n's "linear classifier" strategy: freeze the entire pretrained backbone (`requires_grad = False`
   on all backbone params), replace only the final FC layer, and train just that new head.
 - This works because the frozen backbone acts as a fixed, general-purpose feature extractor — CS231n
@@ -109,55 +132,9 @@ PCA (to 50 dims) before t-SNE -- standard practice, needed for a clean result.
 
 ## 2. Residual Connections in Practice
 
-### The degradation problem (why ResNet was invented)
-- CS231n: empirically, stacking more plain conv layers past a certain depth made networks perform
-  *worse* — a 56-layer plain network had higher training error AND higher test error than a 20-layer one.
-- Important: this rules out overfitting as the explanation, since overfitting would show lower training
-  error but higher test error. Both were worse, meaning the deeper model was harder to *optimize*, not
-  higher-capacity-but-overfit.
-- Deeper networks are strictly more expressive (a deep net can represent everything a shallow net can,
-  by setting extra layers to the identity function) — so in theory more depth should never hurt training
-  performance. The fact that it did points to an optimization difficulty, not a representational one.
-
-### How residual/skip connections fix it
-- Instead of a block learning the full mapping H(x), it learns the residual F(x) = H(x) - x, and the
-  block outputs F(x) + x — the input x is copied forward past the conv layers and added back in.
-- This makes learning the identity function trivial (just drive F(x) to ~0), so a deep ResNet can easily
-  match a shallower network's performance as a "worst case," then improve from there.
-- Gradient flow mechanics (my own addition, not explicitly derived in either video, but consistent with
-  what CS231n implies): the shortcut path gives gradients a direct route back through addition
-  (derivative of x w.r.t. x = 1), so gradients don't have to survive multiplying through every weight
-  layer to reach earlier layers — this is why 100+ layer networks became trainable.
-
-### Expected effect of disabling skip connections (what we should observe experimentally)
-- Based on the degradation-problem discussion: removing skip connections in a deep network should
-  reproduce the original failure mode ResNet fixed — slower convergence, and likely worse training
-  *and* validation performance compared to the version with skip connections intact, especially as we
-  ablate deeper/more blocks.
 
 ## 3. Feature Hierarchies and Representations
 
-- Both lectures describe the same core idea: early conv layers detect low-level, generic features
-  (edges, colors, simple textures); as depth increases, layers detect increasingly complex,
-  composite, and class-specific patterns (parts, then whole-object-level concepts).
-- CS231n's direct evidence: near the end of the network (just before classification), feature vectors
-  for same-class images end up close together in L2 distance — implying that late-layer
-  representations are far more class-separable than early-layer ones.
-- Expectation for our t-SNE/UMAP visualization: early-layer features should show weak/no class
-  clustering (since they encode generic edge/texture info shared across classes), while late-layer
-  features should show tight, well-separated clusters per class.
 
 ## 4. Transfer Learning and Generalization
 
-- CS231n gives a practical 2x2 framework based on (a) how similar the new dataset is to the
-  pretraining dataset, and (b) how much data the new dataset has:
-  - Similar dataset, small data → freeze backbone, train linear head only.
-  - Similar dataset, large data → fine-tune the whole network (still initialized from pretrained
-    weights, not random).
-  - Different dataset → riskier; with lots of data, training from scratch becomes more viable, but
-    initializing from pretrained weights is still worth testing since there's no guaranteed outcome.
-  - Different dataset + small data → hardest case; look for a pretrained model trained on something
-    closer to the target domain.
-- Bias caveat explicitly mentioned in lecture: a model pretrained on ImageNet will perform best on data
-  that "looks like" everyday ImageNet-style images, and worse on very different domains (their example:
-  photos of Mars) — this is a limitation to note when interpreting our own transfer results.
